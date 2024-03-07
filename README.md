@@ -1,1 +1,1 @@
-# pn-ec-namirial-sign
+# pn-ss-namirial-sign
