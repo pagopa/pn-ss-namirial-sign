@@ -1,0 +1,15 @@
+<configuration>
+    <variable name="PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} | %-5level | %t | %logger{1} | %msg%n" />
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="it.pagopa.pn.library" level="debug" />
+<!--    <logger name="reactor.netty.http" level="warn" />-->
+    <root level="debug">
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+</configuration>
