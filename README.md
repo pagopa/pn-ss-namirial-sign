@@ -6,7 +6,15 @@ This is a library to sign document using PAdES, XAdES and CAdES format.
 
 ## Requirements
 - Java 17
-- Maven 3.9+
+- Maven 3.8.1
+
+## Configuration
+
+The library uses the following environment variables:
+- `PnEcNamirialServerAddress`: the URL of the Namirial Sign service
+
+The library uses the following properties:
+- `namirial.server.apikey`: the API key to access the Namirial Sign service
 
 ## Usage
 
@@ -23,26 +31,18 @@ This is a library to sign document using PAdES, XAdES and CAdES format.
 ```java
 PnSignService signService = new PnSignServiceImpl();
 
-...
-
-byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
+// Load content from file
+byte[] bytes = ...
 Mono<PnSignDocumentResponse> responseBes = signService
-        .signPdfDocument(bytes, false)
-        .flatMap(b -> consume signed content);
+        .signPdfDocument(bytes, false).flatMap(b -> consume signed content);
+```
+
+## Build and install
+```shell
+./mvnw clean install
 ```
 
 ## Run tests
-
-**On Windows**
 ```shell
-set PnEcNamirialServerAddress=<api_endpoint>
-mvn test -Dnamirial.server.apikey=<your_api_key>
+./mvnw test
 ```
-
-**On Linux**
-```shell
-export PnEcNamirialServerAddress=<api_endpoint>
-mvn test -Dnamirial.server.apikey=<your_api_key>
-```
-
-Then check the `src/testresources/out` folder for generated signed file.

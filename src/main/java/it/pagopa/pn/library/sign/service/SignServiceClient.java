@@ -1,20 +1,19 @@
 package it.pagopa.pn.library.sign.service;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.library.exceptions.PnSpapiPermanentErrorException;
 import it.pagopa.pn.library.exceptions.PnSpapiTemporaryErrorException;
 import it.pagopa.pn.library.sign.pojo.PnSignDocumentResponse;
 import it.pagopa.pn.library.sign.pojo.ServerErrorResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.client.HttpClientResponse;
-import reactor.netty.resources.ConnectionProvider;
 
 import java.io.ByteArrayInputStream;
-import java.net.SocketTimeoutException;
-import java.time.Duration;
+import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 @Slf4j
@@ -24,16 +23,17 @@ public class SignServiceClient {
     private static final String API_ENDPOINT_PROP = "PnEcNamirialServerAddress";
     private static final String API_KEY_HEADER_NAME = "X-SIGNBOX-EASYSIGN";
     private static final String REQUEST_ID_HEADER_NAME = "X-SIGNBOX-TRANSACTION-ID";
-    private static final ObjectMapper objectMapper = new ObjectMapper().disable(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final HttpClient httpClient = HttpClient.create();
-    public static Mono<PnSignDocumentResponse> sign(String requestId, byte[] data, String format, String level) {
+
+    public static Mono<PnSignDocumentResponse> sign(String apiEndpoint, String requestId, byte[] data, String format, String level) {
         return httpClient
                 .headers(h -> {
                     h.set(API_KEY_HEADER_NAME, getApiKey());
                     h.set(REQUEST_ID_HEADER_NAME, requestId);
                 })
                 .post()
-                .uri(getApiEndpoint())
+                .uri(StringUtils.isNotBlank(apiEndpoint) ? apiEndpoint : getApiEndpoint())
                 .sendForm((req, form) -> {
                     form.multipart(true)
                             .file("file", requestId, new ByteArrayInputStream(data), "application/octet-stream")
@@ -43,9 +43,14 @@ public class SignServiceClient {
                 .responseSingle((response, responseBody) -> {
                     var responseId = response.responseHeaders().get(REQUEST_ID_HEADER_NAME);
                     return switch (response.status().code()) {
-                        case 200 -> responseBody.asByteArray().flatMap(buffer -> parseResponse(response, buffer, responseId));
-                        case 503 -> responseBody.asByteArray().flatMap(buffer -> getTemporaryError(response, buffer, responseId));
-                        default -> responseBody.asByteArray().flatMap(buffer -> getPermanentError(response, buffer, responseId));
+                        case 200 ->
+                                responseBody.asByteArray().flatMap(buffer -> parseResponse(response, buffer, responseId));
+                        case 503 ->
+                                responseBody.asByteArray().flatMap(buffer -> getTemporaryError(response, buffer, responseId))
+                                        .switchIfEmpty(Mono.error(new PnSpapiTemporaryErrorException(response.status().reasonPhrase())));
+                        default ->
+                                responseBody.asByteArray().flatMap(buffer -> getPermanentError(response, buffer, responseId))
+                                        .switchIfEmpty(Mono.error(new PnSpapiPermanentErrorException(response.status().reasonPhrase())));
 
                     };
                 })
@@ -58,14 +63,13 @@ public class SignServiceClient {
     }
 
     private static Mono<PnSignDocumentResponse> resumeError(Throwable t) {
-
+        log.error("Resume from error with instanceof [{}]: {} ", ExceptionUtils.getRootCause(t).getClass().getCanonicalName(), t.getMessage());
         if (t instanceof PnSpapiTemporaryErrorException) {
             return Mono.error(t);
         }
-        if(t instanceof SocketTimeoutException || t instanceof TimeoutException){
+        if (t instanceof TimeoutException || t instanceof IOException) {
             return Mono.error(new PnSpapiTemporaryErrorException(t.getMessage(), t));
-        }
-        else {
+        } else {
             // wrap any other exception in a PnSpapiPermanentErrorException
             return Mono.error(new PnSpapiPermanentErrorException(t.getMessage(), t));
         }
@@ -96,7 +100,6 @@ public class SignServiceClient {
             if (stringBody.startsWith("\"") && stringBody.endsWith("\"")) {
                 stringBody = stringBody.substring(1, stringBody.length() - 1);
             }
-            log.error("Response serialized: {}", stringBody);
             errorResponse = objectMapper.readValue(stringBody, ServerErrorResponse.class);
             log.debug("Response deserialized: {}", errorResponse);
         } catch (Exception e) {

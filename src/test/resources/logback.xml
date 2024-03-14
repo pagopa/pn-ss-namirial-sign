@@ -8,7 +8,7 @@
 
     <logger name="it.pagopa.pn.library" level="debug" />
 <!--    <logger name="reactor.netty.http" level="warn" />-->
-    <root level="debug">
+    <root level="info">
         <appender-ref ref="CONSOLE" />
     </root>
 
