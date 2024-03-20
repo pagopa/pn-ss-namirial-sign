@@ -1,9 +1,10 @@
-package it.pagopa.pn.library.sign.service;
+package com.namirial.sign.library.service;
 
+import com.namirial.sign.library.pojo.SignatureLevel;
 import it.pagopa.pn.library.exceptions.PnSpapiPermanentErrorException;
 import it.pagopa.pn.library.sign.pojo.PnSignDocumentResponse;
-import it.pagopa.pn.library.sign.pojo.SignatureFormat;
-import it.pagopa.pn.library.sign.pojo.SignatureLevel;
+import com.namirial.sign.library.pojo.SignatureFormat;
+import it.pagopa.pn.library.sign.service.PnSignService;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

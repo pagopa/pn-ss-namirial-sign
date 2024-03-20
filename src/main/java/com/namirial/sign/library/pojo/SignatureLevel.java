@@ -1,4 +1,4 @@
-package it.pagopa.pn.library.sign.pojo;
+package com.namirial.sign.library.pojo;
 
 public interface SignatureLevel {
     String BASIC = "BES";

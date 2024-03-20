@@ -2,10 +2,11 @@ package it.pagopa.pn.library.sign.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.namirial.sign.library.service.PnSignServiceImpl;
 import it.pagopa.pn.library.exceptions.PnSpapiPermanentErrorException;
 import it.pagopa.pn.library.exceptions.PnSpapiTemporaryErrorException;
 import it.pagopa.pn.library.sign.pojo.PnSignDocumentResponse;
-import it.pagopa.pn.library.sign.pojo.ServerErrorResponse;
+import com.namirial.sign.library.pojo.ServerErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;

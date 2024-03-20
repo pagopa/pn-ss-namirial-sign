@@ -1,10 +1,10 @@
-package it.pagopa.pn.library.sign.service;
+package com.namirial.sign.library.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.pn.library.exceptions.PnSpapiPermanentErrorException;
 import it.pagopa.pn.library.exceptions.PnSpapiTemporaryErrorException;
 import it.pagopa.pn.library.sign.pojo.PnSignDocumentResponse;
-import it.pagopa.pn.library.sign.pojo.ServerErrorResponse;
+import com.namirial.sign.library.pojo.ServerErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
