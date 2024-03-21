@@ -2,23 +2,20 @@ package it.pagopa.pn.library.sign.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.namirial.sign.library.pojo.ServerErrorResponse;
 import com.namirial.sign.library.service.PnSignServiceImpl;
 import it.pagopa.pn.library.exceptions.PnSpapiPermanentErrorException;
 import it.pagopa.pn.library.exceptions.PnSpapiTemporaryErrorException;
 import it.pagopa.pn.library.sign.pojo.PnSignDocumentResponse;
-import com.namirial.sign.library.pojo.ServerErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okio.Buffer;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -27,18 +24,16 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Slf4j
-@TestMethodOrder(value = MethodOrderer.OrderAnnotation.class)
 public class PnSignServiceImplTest {
     private static MockWebServer mockWebServer;
     private static PnSignService signService;
     private static PnSignService defaultClient;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    @BeforeAll
-    public static void beforeAll() throws IOException {
+    @BeforeEach
+    public void beforeEach() throws IOException {
         mockWebServer = new MockWebServer();
         mockWebServer.start();
-
         signService = new PnSignServiceImpl(mockWebServer.url("/").toString());
         defaultClient = new PnSignServiceImpl();
     }
@@ -50,7 +45,6 @@ public class PnSignServiceImplTest {
 
     @Test
     @DisplayName("Sign a PDF file using PADES format and BES and T level correctly")
-    @Order(1)
     void testSignPdfDocument() throws IOException {
 
         byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
@@ -67,7 +61,6 @@ public class PnSignServiceImplTest {
 
     @Test
     @DisplayName("Try to sign a PDF file and handle possible failures")
-    @Order(2)
     void testSignPdfDocumentWithErrors() throws IOException {
 
         // Handle null input
@@ -88,7 +81,6 @@ public class PnSignServiceImplTest {
 
     @Test
     @DisplayName("Sign a XML file using XADES format and BES and T level correctly")
-    @Order(3)
     void testSignXmlDocument() throws IOException {
         byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.xml"));
         var okResponse = getOkResponse(bytes);
@@ -104,7 +96,6 @@ public class PnSignServiceImplTest {
 
     @Test
     @DisplayName("Try to sign a XML file and handle possible failures")
-    @Order(4)
     void testSignXmlDocumentWithErrors() throws IOException {
 
         // Handle null input
@@ -122,7 +113,6 @@ public class PnSignServiceImplTest {
 
     @Test
     @DisplayName("Sign a PDF file using CADES format and BES and T level correctly")
-    @Order(5)
     void testSignPck7Document() throws IOException {
         byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
         var okResponse = getOkResponse(bytes);
@@ -137,7 +127,6 @@ public class PnSignServiceImplTest {
     }
     @Test
     @DisplayName("Try to sign a PDF file using PKCS7 format and handle possible failures")
-    @Order(6)
     void testSignPkcs7DocumentWithErrors() throws IOException {
 
         // Handle null input
@@ -157,7 +146,6 @@ public class PnSignServiceImplTest {
 
     @Test
     @DisplayName("Test IOException handling")
-    @Order(7)
     void testInternalException() throws IOException {
         mockWebServer.shutdown();
         var pdf = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
@@ -173,7 +161,6 @@ public class PnSignServiceImplTest {
 
     @Test
     @DisplayName("Test initialization with default client")
-    @Order(8)
     void testDefaultClientInit() throws IOException {
         var pdf = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
         var xml = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.xml"));
