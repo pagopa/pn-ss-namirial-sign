@@ -20,7 +20,7 @@ import java.util.concurrent.TimeoutException;
 public class SignServiceClient {
 
     private static final String API_KEY_PROP = "namirial.server.apikey";
-    private static final String API_ENDPOINT_PROP = "PnEcNamirialServerAddress";
+    private static final String API_ENDPOINT_PROP = "namirial.server.address";
     private static final String API_KEY_HEADER_NAME = "X-SIGNBOX-EASYSIGN";
     private static final String REQUEST_ID_HEADER_NAME = "X-SIGNBOX-TRANSACTION-ID";
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -115,8 +115,8 @@ public class SignServiceClient {
     }
 
     public static String getApiEndpoint() {
-        return (System.getenv(API_ENDPOINT_PROP) == null || System.getenv(API_ENDPOINT_PROP).trim().isEmpty())
+        return (System.getProperty(API_ENDPOINT_PROP) == null || System.getProperty(API_ENDPOINT_PROP).trim().isEmpty())
                 ? ""
-                : System.getenv(API_ENDPOINT_PROP);
+                : System.getProperty(API_ENDPOINT_PROP);
     }
 }
