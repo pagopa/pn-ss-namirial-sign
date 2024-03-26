@@ -10,10 +10,8 @@ This is a library to sign document using PAdES, XAdES and CAdES format.
 
 ## Configuration
 
-The library uses the following environment variables:
-- `PnEcNamirialServerAddress`: the URL of the Namirial Sign service
-
 The library uses the following properties:
+- `namirial.server.address`: the URL of the Namirial Sign service
 - `namirial.server.apikey`: the API key to access the Namirial Sign service
 
 ## Usage
