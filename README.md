@@ -13,6 +13,8 @@ This is a library to sign document using PAdES, XAdES and CAdES format.
 The library uses the following properties:
 - `namirial.server.address`: the URL of the Namirial Sign service
 - `namirial.server.apikey`: the API key to access the Namirial Sign service
+- `namirial.server.max-connections`: the number of maximum connections to the Namirial Sign service (default: 40)
+- `namirial.server.pending-acquire-timeout`: the timeout in seconds to acquire a connection to the Namirial Sign service (default: 600)
 
 ## Usage
 

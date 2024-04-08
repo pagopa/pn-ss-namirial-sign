@@ -1,30 +1,39 @@
 package com.namirial.sign.library.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.namirial.sign.library.pojo.ServerErrorResponse;
 import it.pagopa.pn.library.exceptions.PnSpapiPermanentErrorException;
 import it.pagopa.pn.library.exceptions.PnSpapiTemporaryErrorException;
 import it.pagopa.pn.library.sign.pojo.PnSignDocumentResponse;
-import com.namirial.sign.library.pojo.ServerErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.client.HttpClientResponse;
+import reactor.netty.resources.ConnectionProvider;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.concurrent.TimeoutException;
+import java.time.Duration;
 
 @Slf4j
 public class SignServiceClient {
 
     private static final String API_KEY_PROP = "namirial.server.apikey";
     private static final String API_ENDPOINT_PROP = "namirial.server.address";
+    private static final String MAX_CONNECTIONS_PROP = "namirial.server.max-connections";
+    public static final int DEFAULT_MAX_CONNECTIONS = 40;
+    private static final String PENDING_ACQUIRE_TIMEOUT = "namirial.server.pending-acquire-timeout";
+    private static final int DEFAULT_PENDING_ACQUIRE_TIMEOUT = 600;
     private static final String API_KEY_HEADER_NAME = "X-SIGNBOX-EASYSIGN";
     private static final String REQUEST_ID_HEADER_NAME = "X-SIGNBOX-TRANSACTION-ID";
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final HttpClient httpClient = HttpClient.create();
+    private static final ConnectionProvider provider = ConnectionProvider.builder("custom")
+                    .maxConnections(getMaxConnections())
+                    .pendingAcquireTimeout(Duration.ofSeconds(getPendingAcquireTimeout()))
+                    .pendingAcquireMaxCount(-1)
+                    .build();
+    private static final HttpClient httpClient = HttpClient.create(provider);
 
     public static Mono<PnSignDocumentResponse> sign(String apiEndpoint, String requestId, byte[] data, String format, String level) {
         return httpClient
@@ -45,12 +54,12 @@ public class SignServiceClient {
                     return switch (response.status().code()) {
                         case 200 ->
                                 responseBody.asByteArray().flatMap(buffer -> parseResponse(response, buffer, responseId));
-                        case 503 ->
-                                responseBody.asByteArray().flatMap(buffer -> getTemporaryError(response, buffer, responseId))
-                                        .switchIfEmpty(Mono.error(new PnSpapiTemporaryErrorException(response.status().reasonPhrase())));
-                        default ->
+                        case 401 ->
                                 responseBody.asByteArray().flatMap(buffer -> getPermanentError(response, buffer, responseId))
                                         .switchIfEmpty(Mono.error(new PnSpapiPermanentErrorException(response.status().reasonPhrase())));
+                        default ->
+                                responseBody.asByteArray().flatMap(buffer -> getTemporaryError(response, buffer, responseId))
+                                        .switchIfEmpty(Mono.error(new PnSpapiTemporaryErrorException(response.status().reasonPhrase())));
 
                     };
                 })
@@ -64,15 +73,10 @@ public class SignServiceClient {
 
     private static Mono<PnSignDocumentResponse> resumeError(Throwable t) {
         log.error("Resume from error with instanceof [{}]: {} ", ExceptionUtils.getRootCause(t).getClass().getCanonicalName(), t.getMessage());
-        if (t instanceof PnSpapiTemporaryErrorException) {
+        if (t instanceof PnSpapiPermanentErrorException) {
             return Mono.error(t);
         }
-        if (t instanceof TimeoutException || t instanceof IOException) {
-            return Mono.error(new PnSpapiTemporaryErrorException(t.getMessage(), t));
-        } else {
-            // wrap any other exception in a PnSpapiPermanentErrorException
-            return Mono.error(new PnSpapiPermanentErrorException(t.getMessage(), t));
-        }
+        return Mono.error(new PnSpapiTemporaryErrorException(t.getMessage(), t));
     }
 
     private static Mono<PnSignDocumentResponse> getTemporaryError(HttpClientResponse response, byte[] buffer, String responseId) {
@@ -118,5 +122,17 @@ public class SignServiceClient {
         return (System.getProperty(API_ENDPOINT_PROP) == null || System.getProperty(API_ENDPOINT_PROP).trim().isEmpty())
                 ? ""
                 : System.getProperty(API_ENDPOINT_PROP);
+    }
+
+    public static Integer getMaxConnections() {
+        return (System.getProperty(MAX_CONNECTIONS_PROP) == null || System.getProperty(MAX_CONNECTIONS_PROP).trim().isEmpty())
+                ? DEFAULT_MAX_CONNECTIONS
+                : Integer.parseInt(System.getProperty(MAX_CONNECTIONS_PROP));
+    }
+
+    public static Integer getPendingAcquireTimeout() {
+        return (System.getProperty(PENDING_ACQUIRE_TIMEOUT) == null || System.getProperty(PENDING_ACQUIRE_TIMEOUT).trim().isEmpty())
+                ? DEFAULT_PENDING_ACQUIRE_TIMEOUT
+                : Integer.parseInt(System.getProperty(PENDING_ACQUIRE_TIMEOUT));
     }
 }
