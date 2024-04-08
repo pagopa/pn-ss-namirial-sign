@@ -169,9 +169,9 @@ public class PnSignServiceImplTest {
         var responseMonoPades = defaultClient.signPdfDocument(pdf, false);
         var responseMonoXades = defaultClient.signXmlDocument(xml, false);
         var responseMonoPkcs7 = defaultClient.pkcs7Signature(pdf, false);
-        StepVerifier.create(responseMonoPades).expectErrorMatches(t -> t instanceof PnSpapiPermanentErrorException).verify();
-        StepVerifier.create(responseMonoXades).expectErrorMatches(t -> t instanceof PnSpapiPermanentErrorException).verify();
-        StepVerifier.create(responseMonoPkcs7).expectErrorMatches(t -> t instanceof PnSpapiPermanentErrorException).verify();
+        StepVerifier.create(responseMonoPades).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
+        StepVerifier.create(responseMonoXades).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
+        StepVerifier.create(responseMonoPkcs7).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
     }
 
 
@@ -181,9 +181,10 @@ public class PnSignServiceImplTest {
     }
 
     private static void checkAssertionsBasedOnErrors(Mono<PnSignDocumentResponse> responseMono) {
+        StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
         StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiPermanentErrorException).verify();
-        StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiPermanentErrorException).verify();
-        StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiPermanentErrorException).verify();
+        StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
+        StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
         StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
         StepVerifier.create(responseMono).expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException).verify();
     }
@@ -206,15 +207,17 @@ public class PnSignServiceImplTest {
                 """;
 
         // Mock responses
-        MockResponse error400 = new MockResponse().setResponseCode(400).setBody(badRequestErrorBody); // Permanent error
-        MockResponse error500 = new MockResponse().setResponseCode(500).setBody(genericErrorBody);    // Permanent error
-        MockResponse error501 = new MockResponse().setResponseCode(501);                              // Permanent error
+        MockResponse error400 = new MockResponse().setResponseCode(400).setBody(badRequestErrorBody); // Temporary error
+        MockResponse error401 = new MockResponse().setResponseCode(401);                              // Permanent error
+        MockResponse error500 = new MockResponse().setResponseCode(500).setBody(genericErrorBody);    // Temporary error
+        MockResponse error501 = new MockResponse().setResponseCode(501);                              // Temporary error
         MockResponse error503 = new MockResponse().setResponseCode(503).setBody(unexpectedPayload);   // Temporary error
         MockResponse error503WithBody = new MockResponse().setResponseCode(503)                       // Temporary error
                 .setBody(overloadedServerErrorBody);
 
         // Enqueue responses
         mockWebServer.enqueue(error400);
+        mockWebServer.enqueue(error401);
         mockWebServer.enqueue(error500);
         mockWebServer.enqueue(error501);
         mockWebServer.enqueue(error503);
