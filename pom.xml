@@ -12,7 +12,7 @@
 
     <groupId>com.namirial.sign.library</groupId>
     <artifactId>pn-ss-namirial-sign</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
     <name>pn-ss-namirial-sign</name>
     <description>An implementation of sign interface</description>
     <scm>
