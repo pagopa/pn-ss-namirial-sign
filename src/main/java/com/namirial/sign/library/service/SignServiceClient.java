@@ -78,7 +78,6 @@ public class SignServiceClient {
                             log.debug("Created temp file: {}", tempFile);
                             return tempFile;
                         })
-
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(tempFile -> Mono.using(
                         () -> tempFile,

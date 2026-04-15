@@ -247,7 +247,6 @@ public class PnSignServiceImplTest {
         Path isolatedTempDir = Files.createTempDirectory("namirial-test-");
         String originalTmpDir = System.getProperty("java.io.tmpdir");
         System.setProperty("java.io.tmpdir", isolatedTempDir.toString());
-
         try {
             File[] namirialFilesBefore = isolatedTempDir.toFile().listFiles(
                     f -> f.getName().startsWith("namirial-sign-")
