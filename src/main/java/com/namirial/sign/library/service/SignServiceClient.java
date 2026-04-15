@@ -10,6 +10,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.client.HttpClientResponse;
 import reactor.netty.resources.ConnectionProvider;
@@ -69,53 +70,55 @@ public class SignServiceClient {
      * @return A {@link Mono} that will emit the response from the service
      */
     public static Mono<PnSignDocumentResponse> sign(String apiEndpoint, String requestId, byte[] data, String format, String level) {
-        return Mono.using(
+        return Mono.fromCallable(
 
-                () -> {
-                    Path tempFile = Files.createTempFile("namirial-sign-", ".tmp");
-                    Files.write(tempFile, data);
-                    log.debug("Created temp file: {}", tempFile);
-                    return tempFile;
-                },
+                        () -> {
+                            Path tempFile = Files.createTempFile("namirial-sign-", ".tmp");
+                            Files.write(tempFile, data);
+                            log.debug("Created temp file: {}", tempFile);
+                            return tempFile;
+                        })
 
-                tempFile -> httpClient
-                        .headers(h -> {
-                            h.set(AUTHORIZATION_HEADER_NAME, BASIC_AUTH + Base64.encodeBase64String((getUsername() + ":" + getPassword()).getBytes()));
-                            h.set(API_KEY_HEADER_NAME, getApiKey());
-                            h.set(REQUEST_ID_HEADER_NAME, requestId);
-                        })
-                        .post()
-                        .uri(StringUtils.isNotBlank(apiEndpoint) ? apiEndpoint : getApiEndpoint())
-                        .sendForm((req, form) -> {
-                            form.multipart(true)
-                                    .file("file", requestId, tempFile.toFile(), "application/octet-stream")
-                                    .attr("level", level)
-                                    .attr("format", format);
-                        })
-                        .responseSingle((response, responseBody) -> {
-                            var responseId = response.responseHeaders().get(REQUEST_ID_HEADER_NAME);
-                            return switch (response.status().code()) {
-                                case 200 ->
-                                        responseBody.asByteArray().flatMap(buffer -> parseResponse(response, buffer, responseId));
-                                case 401 ->
-                                        responseBody.asByteArray().flatMap(buffer -> getPermanentError(response, buffer, responseId))
-                                                .switchIfEmpty(Mono.error(new PnSpapiPermanentErrorException(response.status().reasonPhrase())));
-                                default ->
-                                        responseBody.asByteArray().flatMap(buffer -> getTemporaryError(response, buffer, responseId))
-                                                .switchIfEmpty(Mono.error(new PnSpapiTemporaryErrorException(response.status().reasonPhrase())));
-                            };
-                        })
-                        .onErrorResume(SignServiceClient::resumeError),
-
-                tempFile -> {
-                    try {
-                        Files.deleteIfExists(tempFile);
-                        log.debug("Deleted temp file: {}", tempFile);
-                    } catch (IOException e) {
-                        log.warn("Failed to delete temp file {}: {}", tempFile, e.getMessage());
-                    }
-                }
-        );
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(tempFile -> Mono.using(
+                        () -> tempFile,
+                        t -> httpClient
+                                .headers(h -> {
+                                    h.set(AUTHORIZATION_HEADER_NAME, BASIC_AUTH + Base64.encodeBase64String((getUsername() + ":" + getPassword()).getBytes()));
+                                    h.set(API_KEY_HEADER_NAME, getApiKey());
+                                    h.set(REQUEST_ID_HEADER_NAME, requestId);
+                                })
+                                .post()
+                                .uri(StringUtils.isNotBlank(apiEndpoint) ? apiEndpoint : getApiEndpoint())
+                                .sendForm((req, form) -> {
+                                    form.multipart(true)
+                                            .file("file", requestId, t.toFile(), "application/octet-stream")
+                                            .attr("level", level)
+                                            .attr("format", format);
+                                })
+                                .responseSingle((response, responseBody) -> {
+                                    var responseId = response.responseHeaders().get(REQUEST_ID_HEADER_NAME);
+                                    return switch (response.status().code()) {
+                                        case 200 ->
+                                                responseBody.asByteArray().flatMap(buffer -> parseResponse(response, buffer, responseId));
+                                        case 401 ->
+                                                responseBody.asByteArray().flatMap(buffer -> getPermanentError(response, buffer, responseId))
+                                                        .switchIfEmpty(Mono.error(new PnSpapiPermanentErrorException(response.status().reasonPhrase())));
+                                        default ->
+                                                responseBody.asByteArray().flatMap(buffer -> getTemporaryError(response, buffer, responseId))
+                                                        .switchIfEmpty(Mono.error(new PnSpapiTemporaryErrorException(response.status().reasonPhrase())));
+                                    };
+                                })
+                                .onErrorResume(SignServiceClient::resumeError),
+                        t -> {
+                            try {
+                                Files.deleteIfExists(t);
+                                log.debug("Deleted temp file: {}", t);
+                            } catch (IOException e) {
+                                log.warn("Failed to delete temp file {}: {}", t, e.getMessage());
+                            }
+                        }
+                ));
     }
 
     /**

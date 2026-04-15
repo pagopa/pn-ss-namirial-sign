@@ -21,12 +21,12 @@ import reactor.test.StepVerifier;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 @Slf4j
@@ -241,73 +241,76 @@ public class PnSignServiceImplTest {
     }
 
     @Test
-    @DisplayName("Verify that temp files in /tmp are created during signing and deleted after completion")
+    @DisplayName("Verify that temp files in java.io.tmpdir are created during signing and deleted after completion")
     void testTempFileCleanup() throws IOException {
 
-        Path tempDir = Path.of(System.getProperty("java.io.tmpdir"));
-        File[] namirialFilesBefore = tempDir.toFile().listFiles(
-                f -> f.getName().startsWith("namirial-sign-")
-        );
-        assertNotNull(namirialFilesBefore);
-        assertEquals(0, namirialFilesBefore.length,
-                "La cartella /tmp non dovrebbe contenere file namirial-sign-* prima della chiamata");
+        Path isolatedTempDir = Files.createTempDirectory("namirial-test-");
+        String originalTmpDir = System.getProperty("java.io.tmpdir");
+        System.setProperty("java.io.tmpdir", isolatedTempDir.toString());
 
-        byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "application/octet-stream")
-                .setHeader("X-SIGNBOX-TRANSACTION-ID", "123456")
-                .setBodyDelay(500, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .setBody(new okio.Buffer().write(bytes)));
-
-        Mono<PnSignDocumentResponse> responseMono = signService.signPdfDocument(bytes, false);
-
-        AtomicReference<File[]> namirialFilesDuring = new AtomicReference<>();
-        responseMono = responseMono.doOnSubscribe(subscription -> {
-            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
-            namirialFilesDuring.set(tempDir.toFile().listFiles(
+        try {
+            File[] namirialFilesBefore = isolatedTempDir.toFile().listFiles(
                     f -> f.getName().startsWith("namirial-sign-")
-            ));
-        });
+            );
+            assertNotNull(namirialFilesBefore);
+            assertEquals(0, namirialFilesBefore.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* prima della chiamata");
+            byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
+            mockWebServer.enqueue(new MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "application/octet-stream")
+                    .setHeader("X-SIGNBOX-TRANSACTION-ID", "123456")
+                    .setBody(new okio.Buffer().write(bytes)));
 
-        StepVerifier.create(responseMono)
-                .expectNextCount(1)
-                .verifyComplete();
+            StepVerifier.create(signService.signPdfDocument(bytes, false))
+                    .expectNextCount(1)
+                    .verifyComplete();
 
-        assertNotNull(namirialFilesDuring.get());
-        File[] namirialFilesAfter = tempDir.toFile().listFiles(
-                f -> f.getName().startsWith("namirial-sign-")
-        );
-        assertNotNull(namirialFilesAfter);
-        assertEquals(0, namirialFilesAfter.length,
-                "La cartella /tmp non dovrebbe contenere file namirial-sign-* dopo il completamento");
+            File[] namirialFilesAfter = isolatedTempDir.toFile().listFiles(
+                    f -> f.getName().startsWith("namirial-sign-")
+            );
+            assertNotNull(namirialFilesAfter);
+            assertEquals(0, namirialFilesAfter.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* dopo il completamento");
+
+        } finally {
+            System.setProperty("java.io.tmpdir", originalTmpDir);
+            FileUtils.deleteDirectory(isolatedTempDir.toFile());
+        }
     }
 
     @Test
-    @DisplayName("Verify that temp files are created and deleted even when an exception occurs")
+    @DisplayName("Verify that temp files in java.io.tmpdir are created and deleted even when an exception occurs")
     void testTempFileCleanupOnError() throws IOException {
 
-        Path tempDir = Path.of(System.getProperty("java.io.tmpdir"));
-        File[] namirialFilesBefore = tempDir.toFile().listFiles(
-                f -> f.getName().startsWith("namirial-sign-")
-        );
-        assertNotNull(namirialFilesBefore);
-        assertEquals(0, namirialFilesBefore.length,
-                "La cartella /tmp non dovrebbe contenere file namirial-sign-* prima della chiamata");
+        Path isolatedTempDir = Files.createTempDirectory("namirial-test-");
+        String originalTmpDir = System.getProperty("java.io.tmpdir");
+        System.setProperty("java.io.tmpdir", isolatedTempDir.toString());
 
-        mockWebServer.shutdown();
+        try {
+            File[] namirialFilesBefore = isolatedTempDir.toFile().listFiles(
+                    f -> f.getName().startsWith("namirial-sign-")
+            );
+            assertNotNull(namirialFilesBefore);
+            assertEquals(0, namirialFilesBefore.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* prima della chiamata");
 
-        byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
-        Mono<PnSignDocumentResponse> responseMono = signService.signPdfDocument(bytes, false);
-        StepVerifier.create(responseMono)
-                .expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException)
-                .verify();
+            mockWebServer.shutdown();
+            byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
+            StepVerifier.create(signService.signPdfDocument(bytes, false))
+                    .expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException)
+                    .verify();
 
-        File[] namirialFilesAfter = tempDir.toFile().listFiles(
-                f -> f.getName().startsWith("namirial-sign-")
-        );
-        assertNotNull(namirialFilesAfter);
-        assertEquals(0, namirialFilesAfter.length,
-                "La cartella /tmp non dovrebbe contenere file namirial-sign-* dopo una eccezione");
+            File[] namirialFilesAfter = isolatedTempDir.toFile().listFiles(
+                    f -> f.getName().startsWith("namirial-sign-")
+            );
+            assertNotNull(namirialFilesAfter);
+            assertEquals(0, namirialFilesAfter.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* dopo una eccezione");
+
+        } finally {
+            System.setProperty("java.io.tmpdir", originalTmpDir);
+            FileUtils.deleteDirectory(isolatedTempDir.toFile());
+        }
     }
 }
