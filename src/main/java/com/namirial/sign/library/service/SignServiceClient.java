@@ -91,6 +91,7 @@ public class SignServiceClient {
                                 .uri(StringUtils.isNotBlank(apiEndpoint) ? apiEndpoint : getApiEndpoint())
                                 .sendForm((req, form) -> {
                                     form.multipart(true)
+                                            .cleanOnTerminate(true)
                                             .file("file", requestId, t.toFile(), "application/octet-stream")
                                             .attr("level", level)
                                             .attr("format", format);
