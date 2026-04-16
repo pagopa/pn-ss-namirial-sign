@@ -21,7 +21,13 @@ import reactor.test.StepVerifier;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
+
 
 @Slf4j
 public class PnSignServiceImplTest {
@@ -232,5 +238,78 @@ public class PnSignServiceImplTest {
                 .setHeader("Content-Type", "application/octet-stream")
                 .setHeader("X-SIGNBOX-TRANSACTION-ID", "123456")
                 .setBody(buffer);
+    }
+
+    @Test
+    @DisplayName("Verify that temp files in java.io.tmpdir are created during signing and deleted after completion")
+    void testTempFileCleanup() throws IOException {
+
+        Path isolatedTempDir = Files.createTempDirectory("namirial-test-");
+        String originalTmpDir = System.getProperty("java.io.tmpdir");
+        System.setProperty("java.io.tmpdir", isolatedTempDir.toString());
+        try {
+            File[] namirialFilesBefore = isolatedTempDir.toFile().listFiles(
+                    f -> f.getName().startsWith("namirial-sign-")
+            );
+            assertNotNull(namirialFilesBefore);
+            assertEquals(0, namirialFilesBefore.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* prima della chiamata");
+            byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
+            mockWebServer.enqueue(new MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "application/octet-stream")
+                    .setHeader("X-SIGNBOX-TRANSACTION-ID", "123456")
+                    .setBody(new okio.Buffer().write(bytes)));
+
+            StepVerifier.create(signService.signPdfDocument(bytes, false))
+                    .expectNextCount(1)
+                    .verifyComplete();
+
+            File[] namirialFilesAfter = isolatedTempDir.toFile().listFiles(
+                    f -> f.getName().startsWith("namirial-sign-")
+            );
+            assertNotNull(namirialFilesAfter);
+            assertEquals(0, namirialFilesAfter.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* dopo il completamento");
+
+        } finally {
+            System.setProperty("java.io.tmpdir", originalTmpDir);
+            FileUtils.deleteDirectory(isolatedTempDir.toFile());
+        }
+    }
+
+    @Test
+    @DisplayName("Verify that temp files in java.io.tmpdir are created and deleted even when an exception occurs")
+    void testTempFileCleanupOnError() throws IOException {
+
+        Path isolatedTempDir = Files.createTempDirectory("namirial-test-");
+        String originalTmpDir = System.getProperty("java.io.tmpdir");
+        System.setProperty("java.io.tmpdir", isolatedTempDir.toString());
+
+        try {
+            File[] namirialFilesBefore = isolatedTempDir.toFile().listFiles(
+                    f -> f.getName().startsWith("namirial-sign-")
+            );
+            assertNotNull(namirialFilesBefore);
+            assertEquals(0, namirialFilesBefore.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* prima della chiamata");
+
+            mockWebServer.shutdown();
+            byte[] bytes = FileUtils.readFileToByteArray(new File("src/test/resources/in/sample.pdf"));
+            StepVerifier.create(signService.signPdfDocument(bytes, false))
+                    .expectErrorMatches(t -> t instanceof PnSpapiTemporaryErrorException)
+                    .verify();
+
+            File[] namirialFilesAfter = isolatedTempDir.toFile().listFiles(
+                    f -> f.getName().startsWith("namirial-sign-")
+            );
+            assertNotNull(namirialFilesAfter);
+            assertEquals(0, namirialFilesAfter.length,
+                    "La cartella " + isolatedTempDir + " non dovrebbe contenere file namirial-sign-* dopo una eccezione");
+
+        } finally {
+            System.setProperty("java.io.tmpdir", originalTmpDir);
+            FileUtils.deleteDirectory(isolatedTempDir.toFile());
+        }
     }
 }
